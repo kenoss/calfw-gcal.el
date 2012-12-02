@@ -74,13 +74,32 @@
     ""))
 
 (defun cfw:gcal-format-status (status)
-  (let ((desc  ( nth 0 (split-string status " ")))
-        (start ( nth 1 (split-string status " ")))
-        (end   ( nth 2 (split-string status " "))))
-    (cond
-     (end   (concat desc " " cfw:gcal-month "/" cfw:gcal-day " " start "-" end " JST"))
-     (start (concat desc " " cfw:gcal-month "/" cfw:gcal-day " " start " JST"))
-     (t     (concat desc " " cfw:gcal-month "/" cfw:gcal-day)))))
+  (let* ((lis (split-string (car (split-string status " --")) " "))
+         (desc  ( nth 0 lis))
+         (s ( nth 1 lis))
+         (start (cond ((null s) s)
+                      ((= 2 (length (split-string s ":")))
+                       s)
+                      ((< 2 (length s))
+                       (concat (substring s 0 -2) ":" (substring s -2 nil)))
+                      (t
+                       (append s ":00" nil))))
+         (e ( nth 2 lis))
+         (end (cond ((null e) e)
+                    ((= 2 (length (split-string e ":")))
+                     e)
+                    ((< 2 (length e))
+                     (concat (substring e 0 -2) ":" (substring e -2 nil)))
+                    (t
+                     (append e ":00" nil)))))
+    `(,(concat desc " " cfw:gcal-month "/" cfw:gcal-day
+               (when start (concat " " start))
+               (when end (concat "-" end))
+               (when start " JST"))
+      ,@(mapcan (lambda (str)
+                  (let ((opt (car (split-string str " "))))
+                    (list (concat "--" opt) (substring str (+ 1 (length opt))))))
+                (cdr (split-string status "--"))))))
 
 (defun cfw:gcal-quit ()
   "Kill buffer and delete window."
@@ -188,14 +207,14 @@
   (interactive)
   (let ((date (concat cfw:gcal-month "/" cfw:gcal-day))
         (status (cfw:gcal-edit-extract-status)))
-    (start-process "cfw-gcal-send" nil "google" "calendar" "add" (cfw:gcal-format-status status))
+    (apply #'start-process `("cfw-gcal-send" nil "google" "calendar" "add" ,@(cfw:gcal-format-status status)))
     (cfw:gcal-quit)))
 
 (defun cfw:gcal-delete ()
   (interactive)
   (let ((date (concat cfw:gcal-year "-" cfw:gcal-month "-" cfw:gcal-day))
         (status (cfw:gcal-edit-extract-status)))
-    (start-process "cfw:gcal-send" nil "google" "calendar" "delete" status "--date" date )
+    (start-process "cfw:gcal-send" nil "google" "calendar" "delete" status "--date" date "--yes")
     (cfw:gcal-quit)))
 
 (defun cfw:gcal-gdata-add  (&optional multiple where desc)
